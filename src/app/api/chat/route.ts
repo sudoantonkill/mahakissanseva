@@ -39,9 +39,11 @@ export async function POST(req: Request) {
         const index = pc.Index(PINECONE_INDEX_NAME);
         
         // Generate embedding using BGE-M3
+        console.log("[RAG] Generating BGE-M3 embedding for query:", message.substring(0, 80));
         const extractor = await getExtractor();
         const output = await extractor(message, { pooling: 'mean', normalize: true });
         const vector = Array.from(output.data) as number[];
+        console.log("[RAG] Embedding generated, vector dim:", vector.length);
 
         // Query Pinecone
         const queryResponse = await index.query({
@@ -50,14 +52,23 @@ export async function POST(req: Request) {
           includeMetadata: true,
         });
 
+        console.log("[RAG] Pinecone returned", queryResponse.matches.length, "matches");
         if (queryResponse.matches.length > 0) {
+          queryResponse.matches.forEach((m: any, i: number) => {
+            console.log(`  [RAG] Match ${i + 1}: score=${m.score?.toFixed(4)} source=${m.metadata?.source}`);
+          });
           contextFromPinecone = queryResponse.matches
             .map((match: any) => match.metadata?.text || "")
             .join("\n\n---\n\n");
+          console.log("[RAG] ✅ Pinecone context injected into prompt (" + contextFromPinecone.length + " chars)");
+        } else {
+          console.log("[RAG] ⚠️ No relevant matches found in Pinecone");
         }
       } catch (error) {
-        console.warn("Pinecone RAG step failed or not fully configured:", error);
+        console.warn("[RAG] ❌ Pinecone RAG step failed:", error);
       }
+    } else {
+      console.log("[RAG] ⏭️ Skipped — no PINECONE_API_KEY or empty message");
     }
 
     // 2. Prepare the prompt and model

@@ -71,6 +71,7 @@ export default function Home() {
     setInput("");
     setImageFile(null);
     setImagePreview(null);
+    if (fileRef.current) fileRef.current.value = "";
     setIsLoading(true);
 
     try {
